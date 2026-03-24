@@ -3,119 +3,76 @@ package com.example.Project1.util;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public final class YouTubeUtil 
-{
+public final class YouTubeUtil {
+
     private YouTubeUtil() {}
 
-    public static String extractVideoId(String url)
-    {
-        if (url == null || url.isBlank())
-        {
-            throw new IllegalArgumentException("The Video URL is required.");
+    public static String extractVideoId(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("Video URL is required.");
         }
 
-        String trimmed_Url = url.trim();
+        String trimmed = url.trim();
 
-        try
-        {
-            URI uri = URI.create(trimmed_Url);
-            
+        try {
+            URI uri = URI.create(trimmed);
             String host = Objects.toString(uri.getHost(), "").toLowerCase();
             String path = Objects.toString(uri.getPath(), "");
 
-            
-            // If the link is formatted as "youtu.be/<id>"
-            if (host.contains("youtu.be"))
-            {
-                String candidate;
-
-                if (path.startsWith("/"))
-                {
-                    candidate = path.substring(1);
-                }
-
-                else
-                {
-                    candidate = path;
-                }
+            // youtu.be/<id>
+            if (host.contains("youtu.be")) {
+                String candidate = path.startsWith("/") ? path.substring(1) : path;
+                return stripAfterDelimiters(candidate);
             }
 
-
-            // If the link is formatted as "youtube.com/embed/<id>
-            if (path.startsWith("/embed/"))
-            {
+            // youtube.com/embed/<id>
+            if (path.startsWith("/embed/")) {
                 return stripAfterDelimiters(path.substring("/embed/".length()));
             }
-            
 
-            // If the link is formatted as youtube.com/watch?v=<id>
+            // youtube.com/watch?v=<id>
             Map<String, String> query = parseQuery(uri.getRawQuery());
-
-            if (query.containsKey("v"))
-            {
+            if (query.containsKey("v")) {
                 return stripAfterDelimiters(query.get("v"));
             }
+        } catch (IllegalArgumentException ignored) {
+            // fall through
         }
 
-        catch (IllegalArgumentException ignored)
-        {
-            // Let the argument fall through
+        // fallback: find v=
+        int vIndex = trimmed.indexOf("v=");
+        if (vIndex >= 0) {
+            return stripAfterDelimiters(trimmed.substring(vIndex + 2));
         }
 
-        // If an IllegalArgumentException is raised then try searching using "v="
-        int vIndex = trimmed_Url.indexOf("v=");
-
-        if (vIndex >= 0)
-        {
-            return stripAfterDelimiters(trimmed_Url.substring(vIndex + 2));
-        }
-        
-        // If the video id is still not retrieved 
-        throw new IllegalArgumentException("Could not find Youtube video id from URL: " + trimmed_Url);
+        throw new IllegalArgumentException("Could not extract YouTube video id from URL: " + trimmed);
     }
 
-    
-    // Retrieves the YouTube video's id by taking the string after the delimiter
-    private static String stripAfterDelimiters(String input)
-    {
-        if (input == null) return "";
-
-
-        String output = input;
-
-        for (char delim : new char[]{'?', '&', '#', '/'})
-        {
-            int index = output.indexOf(delim);
-
-            if (index >= 0) output = output.substring(0, index);
+    private static String stripAfterDelimiters(String s) {
+        if (s == null) return "";
+        String out = s;
+        for (char delim : new char[]{'?', '&', '#', '/'} ) {
+            int idx = out.indexOf(delim);
+            if (idx >= 0) out = out.substring(0, idx);
         }
-
-        return output;
+        return out;
     }
 
-
-    // Navigates through a 
-    private static Map<String, String> parseQuery(String rawQuery)
-    {
+    private static Map<String, String> parseQuery(String rawQuery) {
         Map<String, String> map = new HashMap<>();
+        if (rawQuery == null || rawQuery.isBlank()) return map;
 
-        if (rawQuery == null) return map;
-
-        for (String pair : rawQuery.split("&"))
-        {
+        for (String pair : rawQuery.split("&")) {
             int eq = pair.indexOf('=');
             if (eq <= 0) continue;
-
             String key = URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8);
             String val = URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
             map.put(key, val);
         }
-
         return map;
     }
 }
